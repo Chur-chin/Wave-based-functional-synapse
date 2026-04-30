@@ -1,0 +1,20 @@
+# Graphene-hBN Polariton Waveguide for Wave-based Neuromorphic Synapse
+
+**Concept**: Graphene plasmon + hBN phonon polariton hybridization를 이용한 wave interference 기반 functional synapse 구현
+
+### Key Features
+- Serpentine graphene waveguide (piecewise linear + modulation)
+- Phase-controlled dual THz inputs
+- Polariton hybridization modeling (Kubo + anisotropic ε)
+- Multi-readout + nonlinear (tanh) mapping → EPSP/IPSP-like behavior
+- Input-dependent spatial interference pattern
+
+### Results
+- Clear distinction between input combinations (00, 01, 10, 11)
+- Functional excitatory/inhibitory response via intensity → Vout mapping
+- XOR-like behavior in specific readout zones
+
+### How to Run
+```bash
+pip install -r requirements.txt
+python main_simulation.py
