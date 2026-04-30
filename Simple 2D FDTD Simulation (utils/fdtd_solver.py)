@@ -1,0 +1,95 @@
+"""
+2D FDTD Solver for Graphene-hBN Polariton Hybrid Waveguide
+- Yee grid based simple 2D FDTD
+- Graphene plasmon + hBN phonon polariton approximation
+- Serpentine waveguide geometry
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+class FDTD2DPolariton:
+    def __init__(self, config):
+        self.config = config
+        
+        # Grid parameters
+        self.Nx = config.Nx
+        self.Ny = config.Ny
+        self.dx = config.Lx / (self.Nx - 1)
+        self.dy = config.Ly / (self.Ny - 1)
+        self.dt = 0.5 * min(self.dx, self.dy) / 3e8 * 1e6  # μm 단위 조정 (c = 3e8 m/s)
+        
+        # Fields
+        self.Ez = np.zeros((self.Ny, self.Nx))
+        self.Hx = np.zeros((self.Ny, self.Nx))
+        self.Hy = np.zeros((self.Ny, self.Nx))
+        
+        # Material coefficients
+        self.Cez = np.ones((self.Ny, self.Nx))      # Update coefficient for E
+        self.Chx = np.ones((self.Ny, self.Nx))
+        self.Chy = np.ones((self.Ny, self.Nx))
+        
+        self._setup_materials()
+        self._create_geometry()
+        
+        print("2D FDTD Polariton Solver initialized.")
+
+    def _setup_materials(self):
+        """Background material (air-like)"""
+        self.Cez *= 0.5
+        self.Chx *= 0.5
+        self.Chy *= 0.5
+
+    def _create_geometry(self):
+        """Serpentine waveguide + hBN zone"""
+        X, Y = np.meshgrid(np.linspace(-self.config.Lx/2, self.config.Lx/2, self.Nx),
+                           np.linspace(-self.config.Ly/2, self.config.Ly/2, self.Ny))
+        
+        # Serpentine path
+        y_path = 0.8*np.sin(0.7*X) + 0.35*np.sin(1.9*X) + 0.12*X
+        thickness = 1.8
+        
+        self.waveguide_mask = np.abs(Y - y_path) < thickness
+        
+        # hBN coupling zone
+        self.hbn_mask = (np.abs(X - 8.0) < 6.0) & (np.abs(Y) < 4.0)
+        
+        # Apply material properties (approximation)
+        self.Cez[self.waveguide_mask] *= 0.3   # Graphene-like high conductivity
+        self.Cez[self.hbn_mask] *= 0.15        # Strong confinement in hBN
+
+    def update_fields(self, t, source_A=True, source_B=True, phi_A=0.0, phi_B=0.0):
+        """One FDTD time step with two sources"""
+        # Update H fields
+        self.Hx[:, :-1] += self.Chx[:, :-1] * (self.Ez[:, 1:] - self.Ez[:, :-1]) / self.dy
+        self.Hy[:-1, :] += self.Chy[:-1, :] * -(self.Ez[1:, :] - self.Ez[:-1, :]) / self.dx
+        
+        # Update E field
+        self.Ez[1:-1, 1:-1] += self.Cez[1:-1, 1:-1] * (
+            (self.Hy[1:-1, 1:] - self.Hy[1:-1, :-1]) / self.dx -
+            (self.Hx[1:, 1:-1] - self.Hx[:-1, 1:-1]) / self.dy
+        )
+        
+        # Add phase-controlled sources (soft source)
+        if source_A:
+            src_A = self.config.amp_A * np.sin(2*np.pi*0.5*t + phi_A) * np.exp(-((self.config.source_A_pos[0] - (-self.config.Lx/2 + 5))**2)/4)
+            self.Ez[int(self.config.source_A_pos[1]/self.dy + self.Ny/2), 
+                    int(self.config.source_A_pos[0]/self.dx + self.Nx/2)] += src_A
+        
+        if source_B:
+            src_B = self.config.amp_B * np.sin(2*np.pi*0.5*t + phi_B) * np.exp(-((self.config.source_B_pos[0] - (self.config.Lx/2 - 5))**2)/4)
+            self.Ez[int(self.config.source_B_pos[1]/self.dy + self.Ny/2), 
+                    int(self.config.source_B_pos[0]/self.dx + self.Nx/2)] += src_B
+
+    def run_simulation(self, num_steps=800, phi_A=0.0, phi_B=0.0):
+        """Run full simulation and return time-averaged intensity"""
+        Ez_history = np.zeros((self.Ny, self.Nx))
+        
+        for t in range(num_steps):
+            self.update_fields(t, phi_A=phi_A, phi_B=phi_B)
+            if t > num_steps//2:   # steady state after transient
+                Ez_history += self.Ez**2
+                
+        I_avg = Ez_history / (num_steps//2)
+        return I_avg
