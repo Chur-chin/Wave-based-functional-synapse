@@ -1,0 +1,1 @@
+Physical Mechanism: Plasmon-Phonon Polariton Hybridization.  Mapping Logic: Field Intensity $\uparrow$ (Constructive) $\rightarrow$ EPSP-like / Field Cancellation (Destructive) $\rightarrow$ IPSP-like.  Target Device: Functional Synapse for neuromorphic computing.  Tools: COMSOL Multiphysics for wave-level analysis, Python for nonlinear mapping ($V_{out} = \tanh(\alpha|E|^2)$).  
